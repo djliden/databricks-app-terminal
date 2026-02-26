@@ -66,10 +66,10 @@ DBCFG
 }
 
 dbx_agent_exchange_token() {
-  local root="$1"
+  local shared_dir="$1"
   local host_name
   host_name="$(dbx_agent_host_name)"
-  DATABRICKS_HOST="${host_name}" bash "${root}/scripts/get-token.sh"
+  DATABRICKS_HOST="${host_name}" bash "${shared_dir}/get-token.sh"
 }
 
 dbx_agent_write_token_file() {

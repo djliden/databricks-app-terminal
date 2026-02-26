@@ -4,9 +4,10 @@
 __dbx_terminal_type_name="claude"
 __dbx_terminal_type_cmd="${DBX_APP_TERMINAL_CLAUDE_CMD:-claude}"
 __dbx_terminal_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+__dbx_terminal_shared_dir="${__dbx_terminal_root}/terminal-types/_shared"
 
-# shellcheck source=../../scripts/agent-bootstrap.sh
-source "${__dbx_terminal_root}/scripts/agent-bootstrap.sh"
+# shellcheck source=../_shared/agent-bootstrap.sh
+source "${__dbx_terminal_shared_dir}/agent-bootstrap.sh"
 
 dbx_agent_home
 dbx_agent_add_node_path "${__dbx_terminal_root}"
@@ -25,7 +26,7 @@ if ! dbx_agent_write_databrickscfg "${__dbx_host_url}"; then
   return 0
 fi
 
-__dbx_bearer_token="$(dbx_agent_exchange_token "${__dbx_terminal_root}" || true)"
+__dbx_bearer_token="$(dbx_agent_exchange_token "${__dbx_terminal_shared_dir}" || true)"
 if [[ -z "${__dbx_bearer_token}" ]]; then
   __dbx_bearer_token="$(dbx_agent_read_token_file)"
 fi
@@ -47,4 +48,4 @@ fi
 printf '\n[session-type:%s] CLI "%s" was not auto-started.\n' "$__dbx_terminal_type_name" "$__dbx_terminal_type_cmd"
 printf '[session-type:%s] Staying in shell. Run `%s` when ready.\n\n' "$__dbx_terminal_type_name" "$__dbx_terminal_type_cmd"
 
-unset __dbx_terminal_type_name __dbx_terminal_type_cmd __dbx_terminal_root __dbx_host_url __dbx_bearer_token
+unset __dbx_terminal_type_name __dbx_terminal_type_cmd __dbx_terminal_root __dbx_terminal_shared_dir __dbx_host_url __dbx_bearer_token
