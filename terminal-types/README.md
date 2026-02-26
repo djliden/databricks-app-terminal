@@ -44,3 +44,4 @@ Fields:
 - Use it to set env vars and/or `exec` a CLI.
 - If it returns without `exec`, the user stays in a regular shell.
 - Session auth mode (`m2m` / `user`) and Databricks auth env handling are already provided by core runtime.
+- Shared helpers for Databricks-backed agents live in `scripts/agent-bootstrap.sh` and `scripts/get-token.sh`.

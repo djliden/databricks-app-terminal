@@ -39,6 +39,7 @@ Session types are discovered dynamically from `terminal-types/*` at startup.
 - Included profiles in this repo: `claude`, `codex`, `pi` (plus built-in `terminal`).
 - Bundled logo font assets live under `public/assets/terminal-icons` (source SVGs in `assets/terminal-icons/src`).
 - Type launch scripts run on top of the base terminal runtime/auth model.
+- `claude` / `codex` launchers also bootstrap Databricks auth + local CLI config at session start.
 
 ## Databricks identity model
 
@@ -117,6 +118,13 @@ User mode (Databricks CLI delegation):
 - `DATABRICKS_HOST` (preferred) or `DATABRICKS_SERVER_HOSTNAME` (fallback)
 - `USER_ACCESS_TOKEN_HEADER` (default `x-forwarded-access-token`)
 - `ALLOW_USER_TOKEN_AUTH` (default `true`)
+
+Agent launcher controls:
+
+- `DBX_APP_TERMINAL_CLAUDE_CMD` (default `claude`)
+- `DBX_APP_TERMINAL_CODEX_CMD` (default `codex`)
+- `DBX_APP_TERMINAL_CLAUDE_MODEL` (optional default Claude model override)
+- `DBX_APP_TERMINAL_CODEX_MODEL` (default `databricks-gpt-5-3-codex`)
 
 Writable tool paths (for global npm installs in sessions):
 
