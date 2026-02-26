@@ -13,5 +13,4 @@ targets:
     default: true
   sandbox:
     workspace:
-      host: https://dbc-8b4786c2-7611.cloud.databricks.com
       profile: sandbox
