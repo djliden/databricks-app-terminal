@@ -11,6 +11,7 @@ export type SessionEnvRequest = {
   sessionId: string;
   actor: string;
   cwd?: string;
+  typeId?: string;
 };
 
 export type ServiceContext = {

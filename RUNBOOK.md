@@ -33,6 +33,19 @@ Expected status:
 - `GET /ready` -> readiness (shell + PTY + required services)
 - `GET /api/runtime/diagnostics` -> detailed checks and session/runtime stats
 
+## Verify discovered session types
+
+```bash
+curl -sS "$APP_URL/api/session-types"
+```
+
+Expected:
+- includes built-in `terminal`
+- includes any valid entries under `terminal-types/*`
+- `+` in the UI opens a centered in-terminal launcher showing these types
+- first launch with zero sessions also opens the same launcher before any backend session is created
+- launcher supports `?` (help panel) and `a` (about panel)
+
 ## Verify terminal identity behavior
 
 From a terminal session inside the app:

@@ -20,6 +20,7 @@ export type AppConfig = {
   diagnosticsTtlMs: number;
   sessionEnvHookTimeoutMs: number;
   sessionDefaultCwd: string;
+  terminalTypesRoot: string;
   toolsRoot: string;
   npmGlobalPrefix: string;
   npmCacheDir: string;
@@ -122,6 +123,7 @@ export function loadConfig(): AppConfig {
     || (directoryExists(databricksRuntimeRoot) ? databricksRuntimeRoot : cwd);
 
   const sessionDefaultCwd = envString("SESSION_DEFAULT_CWD") || runtimeRoot;
+  const terminalTypesRoot = envString("TERMINAL_TYPES_ROOT") || path.resolve(cwd, "terminal-types");
   const toolsRoot = envString("DBX_APP_TERMINAL_TOOLS_ROOT") || path.join(runtimeRoot, ".dbx-app-terminal-tools");
   const npmGlobalPrefix = envString("DBX_APP_TERMINAL_NPM_PREFIX") || path.join(toolsRoot, "npm-global");
   const npmCacheDir = envString("DBX_APP_TERMINAL_NPM_CACHE") || path.join(toolsRoot, "npm-cache");
@@ -145,6 +147,7 @@ export function loadConfig(): AppConfig {
     diagnosticsTtlMs: clamp(envNumber("DIAGNOSTICS_TTL_MS", 5_000), 100, 60_000),
     sessionEnvHookTimeoutMs: clamp(envNumber("SESSION_ENV_HOOK_TIMEOUT_MS", 100), 10, 5_000),
     sessionDefaultCwd,
+    terminalTypesRoot,
     toolsRoot,
     npmGlobalPrefix,
     npmCacheDir,

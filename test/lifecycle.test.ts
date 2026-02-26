@@ -6,6 +6,7 @@ import type { AppConfig } from "../src/config.js";
 import { Logger } from "../src/logging/logger.js";
 import { ServiceRegistry } from "../src/services/registry.js";
 import type { RuntimeService } from "../src/services/contracts.js";
+import type { TerminalTypeRegistry } from "../src/terminalTypes/types.js";
 import { FakeSessionManager } from "./helpers.js";
 
 function makeConfig(overrides?: Partial<AppConfig>): AppConfig {
@@ -28,6 +29,7 @@ function makeConfig(overrides?: Partial<AppConfig>): AppConfig {
     diagnosticsTtlMs: 5_000,
     sessionEnvHookTimeoutMs: 50,
     sessionDefaultCwd: process.cwd(),
+    terminalTypesRoot: `${process.cwd()}/.test-terminal-types`,
     toolsRoot: `${process.cwd()}/.test-tools`,
     npmGlobalPrefix: `${process.cwd()}/.test-npm-global`,
     npmCacheDir: `${process.cwd()}/.test-npm-cache`,
@@ -41,7 +43,59 @@ function makeConfig(overrides?: Partial<AppConfig>): AppConfig {
   };
 }
 
-function makeApp(services: RuntimeService[] = [], configOverride?: Partial<AppConfig>) {
+function makeTerminalTypes(
+  custom: Array<{ id: string; name: string; badge?: string; description?: string; entrypointPath?: string }> = [],
+): TerminalTypeRegistry {
+  const base = {
+    id: "terminal",
+    name: "Terminal",
+    badge: "terminal",
+    description: "Plain shell session",
+    default: true,
+    builtIn: true,
+  };
+
+  const all = [
+    base,
+    ...custom.map((type) => ({
+      id: type.id,
+      name: type.name,
+      badge: type.badge || type.id,
+      description: type.description,
+      default: false,
+      builtIn: false,
+    })),
+  ];
+
+  const byId = new Map<string, any>();
+  byId.set(base.id, base);
+  for (const type of custom) {
+    byId.set(type.id, {
+      id: type.id,
+      name: type.name,
+      badge: type.badge || type.id,
+      description: type.description,
+      default: false,
+      builtIn: false,
+      entrypointPath: type.entrypointPath,
+    });
+  }
+
+  return {
+    listTypes: () => all.map((type) => ({ ...type })),
+    resolveType: (id) => {
+      const type = byId.get(id);
+      return type ? { ...type } : undefined;
+    },
+    getDefaultType: () => ({ ...base }),
+  };
+}
+
+function makeApp(
+  services: RuntimeService[] = [],
+  configOverride?: Partial<AppConfig>,
+  terminalTypes: TerminalTypeRegistry = makeTerminalTypes(),
+) {
   const config = makeConfig(configOverride);
   const logger = new Logger({
     appName: config.appName,
@@ -80,6 +134,7 @@ function makeApp(services: RuntimeService[] = [], configOverride?: Partial<AppCo
       config,
       logger,
       sessions: sessionManager,
+      terminalTypes,
       services: registry,
       diagnostics,
     }),
@@ -98,6 +153,7 @@ test("session lifecycle endpoints work", async () => {
   const created = await request(app).post("/api/sessions").send({}).expect(201);
   assert.equal(created.body.ok, true);
   assert.equal(created.body.data.authMode, "m2m");
+  assert.equal(created.body.data.typeId, "terminal");
 
   const sessionId = created.body.data.session.sessionId;
   assert.match(sessionId, /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
@@ -130,6 +186,59 @@ test("session lifecycle endpoints work", async () => {
 
   const after = await request(app).get("/api/sessions").expect(200);
   assert.equal(after.body.data.sessions.length, 0);
+});
+
+test("session types endpoint lists built-in terminal type", async () => {
+  const { app } = makeApp();
+
+  const response = await request(app).get("/api/session-types").expect(200);
+
+  assert.equal(response.body.ok, true);
+  assert.equal(Array.isArray(response.body.data.types), true);
+  assert.equal(response.body.data.types.length >= 1, true);
+
+  const terminal = response.body.data.types.find((type: { id: string }) => type.id === "terminal");
+  assert.equal(Boolean(terminal), true);
+});
+
+test("session create rejects unknown session type", async () => {
+  const { app } = makeApp();
+
+  const response = await request(app)
+    .post("/api/sessions")
+    .send({
+      typeId: "unknown-type",
+    })
+    .expect(400);
+
+  assert.equal(response.body.ok, false);
+  assert.equal(response.body.error.code, "INVALID_SESSION_TYPE");
+});
+
+test("session create supports custom session type", async () => {
+  const customTypes = makeTerminalTypes([
+    {
+      id: "claude",
+      name: "Claude Code",
+      entrypointPath: "/tmp/terminal-types/claude/launch.sh",
+    },
+  ]);
+
+  const { app, sessionManager } = makeApp([], undefined, customTypes);
+
+  const created = await request(app)
+    .post("/api/sessions")
+    .send({
+      typeId: "claude",
+    })
+    .expect(201);
+
+  assert.equal(created.body.ok, true);
+  assert.equal(created.body.data.typeId, "claude");
+
+  assert.equal(sessionManager.creates.length, 1);
+  assert.equal(sessionManager.creates[0].typeId, "claude");
+  assert.equal(sessionManager.creates[0].typeEntrypointPath, "/tmp/terminal-types/claude/launch.sh");
 });
 
 test("session create supports user auth mode for Databricks CLI env", async () => {
