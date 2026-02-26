@@ -5,7 +5,7 @@ resources:
   apps:
     app:
       name: databricks-app-terminal
-      description: "Databricks App Terminal: multi-session web terminal"
+      description: "Databricks App Terminal: multi-session web terminal with coding agent support"
       source_code_path: ./
 
 targets:
