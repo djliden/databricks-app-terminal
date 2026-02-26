@@ -74,7 +74,18 @@ The setup script writes Databricks CLI config, Claude Code settings (model routi
 
 ## Deploy
 
-`app.yaml` and `databricks.yml` are included.
+`app.yaml` and a workspace-agnostic `databricks.yml` are included.
+
+If you want target-specific bundle config (host/profile), use the template:
+
+```bash
+cp databricks.template.yml databricks.yml
+```
+
+Then fill these placeholders in `databricks.yml`:
+
+- `__DATABRICKS_WORKSPACE_HOST__` (for example `dbc-xxxxxxxx-xxxx.cloud.databricks.com`)
+- `__DATABRICKS_CLI_PROFILE__` (for example `sandbox` or `DEFAULT`)
 
 ```bash
 npm run build

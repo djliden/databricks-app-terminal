@@ -1,0 +1,24 @@
+# Copy this file to databricks.yml and replace placeholders for your workspace.
+# Example:
+#   cp databricks.template.yml databricks.yml
+# Then update:
+#   __DATABRICKS_WORKSPACE_HOST__
+#   __DATABRICKS_CLI_PROFILE__
+
+bundle:
+  name: databricks-app-terminal
+
+resources:
+  apps:
+    app:
+      name: databricks-app-terminal
+      description: "Databricks App Terminal: multi-session web terminal with coding agent support"
+      source_code_path: ./
+
+targets:
+  default:
+    default: true
+  sandbox:
+    workspace:
+      host: https://__DATABRICKS_WORKSPACE_HOST__
+      profile: __DATABRICKS_CLI_PROFILE__

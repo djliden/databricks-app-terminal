@@ -1,3 +1,5 @@
+# Keep this file workspace-agnostic for public repos.
+# For a profile/host example, copy databricks.template.yml and fill placeholders.
 bundle:
   name: databricks-app-terminal
 
