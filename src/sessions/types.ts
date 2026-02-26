@@ -7,6 +7,7 @@ export type SessionInfo = {
   cols: number;
   rows: number;
   authMode: SessionAuthMode;
+  typeId: string;
   attachedClients: number;
 };
 
@@ -21,6 +22,8 @@ export type CreateSessionInput = {
   cols?: number;
   rows?: number;
   authMode?: SessionAuthMode;
+  typeId?: string;
+  typeEntrypointPath?: string;
   userAccessToken?: string;
   databricksHost?: string;
   userAccessTokenHeader?: string;

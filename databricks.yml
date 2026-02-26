@@ -1,6 +1,10 @@
 bundle:
   name: databricks-app-terminal
 
+sync:
+  exclude:
+    - images/**
+
 resources:
   apps:
     app:

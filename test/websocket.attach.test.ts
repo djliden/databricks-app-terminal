@@ -29,6 +29,7 @@ function makeConfig(overrides?: Partial<AppConfig>): AppConfig {
     diagnosticsTtlMs: 5_000,
     sessionEnvHookTimeoutMs: 50,
     sessionDefaultCwd: process.cwd(),
+    terminalTypesRoot: `${process.cwd()}/.test-terminal-types`,
     toolsRoot: `${process.cwd()}/.test-tools`,
     npmGlobalPrefix: `${process.cwd()}/.test-npm-global`,
     npmCacheDir: `${process.cwd()}/.test-npm-cache`,
@@ -117,10 +118,45 @@ test("websocket attach path streams output", async (t) => {
     }),
   };
 
+  const terminalTypes = {
+    listTypes: () => [
+      {
+        id: "terminal",
+        name: "Terminal",
+        badge: "terminal",
+        description: "Plain shell session",
+        default: true,
+        builtIn: true,
+      },
+    ],
+    resolveType: (id: string) => {
+      if (id !== "terminal") {
+        return undefined;
+      }
+      return {
+        id: "terminal",
+        name: "Terminal",
+        badge: "terminal",
+        description: "Plain shell session",
+        default: true,
+        builtIn: true,
+      };
+    },
+    getDefaultType: () => ({
+      id: "terminal",
+      name: "Terminal",
+      badge: "terminal",
+      description: "Plain shell session",
+      default: true,
+      builtIn: true,
+    }),
+  };
+
   const { server } = createTerminalServer({
     config,
     logger,
     sessions,
+    terminalTypes,
     services: registry,
     diagnostics,
   });

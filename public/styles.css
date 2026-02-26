@@ -9,6 +9,12 @@
   --danger: #ef5350;
 }
 
+@font-face {
+  font-family: "DBX Term Icons";
+  src: url("/assets/terminal-icons/dbx-term-icons.woff2") format("woff2");
+  font-display: block;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -69,6 +75,12 @@ body {
   border-bottom-color: var(--accent);
 }
 
+.tab.launcher .tab-close,
+.tab.launcher .tab-auth,
+.tab.launcher .tab-status {
+  display: none;
+}
+
 .tab-close {
   border: 0;
   margin: 0;
@@ -107,6 +119,19 @@ body {
 
 .tab-auth:hover {
   color: var(--fg);
+}
+
+.tab-type {
+  border: 1px solid var(--border);
+  background: #1a2433;
+  color: #9db8e0;
+  border-radius: 999px;
+  font-size: 0.63rem;
+  line-height: 1;
+  padding: 0.14rem 0.4rem;
+  font-family: "DBX Term Icons", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-transform: none;
+  flex: 0 0 auto;
 }
 
 .tab-label {

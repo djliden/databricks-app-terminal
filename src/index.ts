@@ -7,6 +7,7 @@ import { RuntimeDiagnosticsManager } from "./runtime/diagnostics.js";
 import { InMemoryPtySessionManager } from "./sessions/ptySessionManager.js";
 import { loadRuntimeServices } from "./services/loader.js";
 import { ServiceRegistry } from "./services/registry.js";
+import { loadTerminalTypeRegistry } from "./terminalTypes/registry.js";
 
 type RuntimeToolingPaths = {
   runtimeRoot: string;
@@ -88,6 +89,116 @@ if [[ -z "$mode" ]]; then
 fi
 
 printf '%s\\n' "$mode"
+`;
+}
+
+function buildDatabricksShimScript(): string {
+  return `#!/usr/bin/env bash
+set -euo pipefail
+
+resolve_real_databricks() {
+  local resolved=""
+
+  if [[ -n "\${DBX_APP_TERMINAL_SYSTEM_PATH:-}" ]]; then
+    resolved="$(PATH="\${DBX_APP_TERMINAL_SYSTEM_PATH}" command -v databricks 2>/dev/null || true)"
+  fi
+
+  if [[ -z "$resolved" ]]; then
+    resolved="$(command -v databricks 2>/dev/null || true)"
+  fi
+
+  if [[ -z "$resolved" ]]; then
+    echo "databricks shim: unable to locate real databricks binary" >&2
+    exit 127
+  fi
+
+  local self_path
+  self_path="$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")"
+  local resolved_path
+  resolved_path="$(readlink -f "$resolved" 2>/dev/null || printf '%s' "$resolved")"
+
+  if [[ "$self_path" == "$resolved_path" ]]; then
+    echo "databricks shim: real databricks binary resolves to shim path" >&2
+    exit 127
+  fi
+
+  printf '%s\n' "$resolved"
+}
+
+apply_session_auth_state() {
+  local state_file="\${DBX_APP_TERMINAL_AUTH_STATE_FILE:-}"
+  if [[ -z "$state_file" ]] || [[ ! -r "$state_file" ]]; then
+    return 0
+  fi
+
+  local DBX_APP_TERMINAL_STATE_MODE=""
+  local DBX_APP_TERMINAL_STATE_DATABRICKS_HOST=""
+  local DBX_APP_TERMINAL_STATE_DATABRICKS_TOKEN=""
+  local DBX_APP_TERMINAL_STATE_USER_TOKEN_HEADER=""
+  local DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_HOST=""
+  local DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_HOST_SET="0"
+  local DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_CLIENT_ID=""
+  local DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_CLIENT_ID_SET="0"
+  local DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_CLIENT_SECRET=""
+  local DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_CLIENT_SECRET_SET="0"
+
+  # shellcheck disable=SC1090
+  source "$state_file" >/dev/null 2>&1 || return 0
+
+  local mode="\${DBX_APP_TERMINAL_STATE_MODE:-m2m}"
+  export DBX_APP_TERMINAL_AUTH_MODE="$mode"
+  export DBX_APP_TERMINAL_USER_TOKEN_HEADER="\${DBX_APP_TERMINAL_STATE_USER_TOKEN_HEADER:-x-forwarded-access-token}"
+
+  if [[ "$mode" == "user" ]]; then
+    export DATABRICKS_AUTH_TYPE="pat"
+
+    if [[ -n "\${DBX_APP_TERMINAL_STATE_DATABRICKS_HOST:-}" ]]; then
+      export DATABRICKS_HOST="\${DBX_APP_TERMINAL_STATE_DATABRICKS_HOST}"
+    else
+      unset DATABRICKS_HOST
+    fi
+
+    if [[ -n "\${DBX_APP_TERMINAL_STATE_DATABRICKS_TOKEN:-}" ]]; then
+      export DATABRICKS_TOKEN="\${DBX_APP_TERMINAL_STATE_DATABRICKS_TOKEN}"
+    else
+      unset DATABRICKS_TOKEN
+    fi
+
+    unset DATABRICKS_CLIENT_ID
+    unset DATABRICKS_CLIENT_SECRET
+    return 0
+  fi
+
+  export DATABRICKS_AUTH_TYPE="oauth-m2m"
+  unset DATABRICKS_TOKEN
+
+  if [[ "\${DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_HOST_SET:-0}" == "1" ]]; then
+    export DATABRICKS_HOST="\${DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_HOST:-}"
+  else
+    unset DATABRICKS_HOST
+  fi
+
+  if [[ "\${DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_CLIENT_ID_SET:-0}" == "1" ]]; then
+    export DATABRICKS_CLIENT_ID="\${DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_CLIENT_ID:-}"
+  else
+    unset DATABRICKS_CLIENT_ID
+  fi
+
+  if [[ "\${DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_CLIENT_SECRET_SET:-0}" == "1" ]]; then
+    export DATABRICKS_CLIENT_SECRET="\${DBX_APP_TERMINAL_STATE_ORIG_DATABRICKS_CLIENT_SECRET:-}"
+  else
+    unset DATABRICKS_CLIENT_SECRET
+  fi
+}
+
+main() {
+  apply_session_auth_state
+  local real_databricks
+  real_databricks="$(resolve_real_databricks)"
+  exec "$real_databricks" "$@"
+}
+
+main "$@"
 `;
 }
 
@@ -209,6 +320,13 @@ fi
 if [ -n "\${DBX_APP_TERMINAL_BASH_AUTH_HOOK_PATH:-}" ] && [ -f "\${DBX_APP_TERMINAL_BASH_AUTH_HOOK_PATH}" ]; then
   . "\${DBX_APP_TERMINAL_BASH_AUTH_HOOK_PATH}" >/dev/null 2>&1
 fi
+
+if [ -n "\${DBX_APP_TERMINAL_TYPE_ENTRYPOINT:-}" ] \
+  && [ -z "\${DBX_APP_TERMINAL_TYPE_BOOTSTRAPPED:-}" ] \
+  && [ -f "\${DBX_APP_TERMINAL_TYPE_ENTRYPOINT}" ]; then
+  export DBX_APP_TERMINAL_TYPE_BOOTSTRAPPED=1
+  . "\${DBX_APP_TERMINAL_TYPE_ENTRYPOINT}"
+fi
 `;
 }
 
@@ -219,11 +337,13 @@ async function prepareRuntimeTooling(toolsRoot: string): Promise<RuntimeToolingP
   const bashAuthHookPath = path.join(runtimeRoot, "bash-auth-hook.sh");
   const bashRcPath = path.join(runtimeRoot, "bashrc");
   const dbxAuthPath = path.join(runtimeBinDir, "dbx-auth");
+  const databricksShimPath = path.join(runtimeBinDir, "databricks");
 
   await fs.mkdir(runtimeBinDir, { recursive: true });
   await fs.mkdir(authStateDir, { recursive: true });
 
   await writeFileWithMode(dbxAuthPath, buildDbxAuthScript(), 0o755);
+  await writeFileWithMode(databricksShimPath, buildDatabricksShimScript(), 0o755);
   await writeFileWithMode(bashAuthHookPath, buildBashAuthHookScript(), 0o644);
   await writeFileWithMode(bashRcPath, buildBashRcScript(), 0o644);
 
@@ -258,6 +378,8 @@ async function main(): Promise<void> {
 
   await serviceRegistry.startAll();
 
+  const terminalTypes = await loadTerminalTypeRegistry(config.terminalTypesRoot, logger);
+
   await fs.mkdir(config.npmGlobalPrefix, { recursive: true });
   await fs.mkdir(config.npmCacheDir, { recursive: true });
 
@@ -277,6 +399,7 @@ async function main(): Promise<void> {
       PATH: prefixedPath,
       DBX_APP_TERMINAL_NPM_PREFIX: config.npmGlobalPrefix,
       DBX_APP_TERMINAL_NPM_CACHE: config.npmCacheDir,
+      DBX_APP_TERMINAL_SYSTEM_PATH: existingPath,
       DBX_APP_TERMINAL_PORT: String(config.port),
       DBX_APP_TERMINAL_BASH_AUTH_HOOK_PATH: tooling.bashAuthHookPath,
     },
@@ -307,6 +430,8 @@ async function main(): Promise<void> {
     npmGlobalPrefix: config.npmGlobalPrefix,
     npmCacheDir: config.npmCacheDir,
     runtimeToolingRoot: tooling.runtimeRoot,
+    terminalTypesRoot: config.terminalTypesRoot,
+    terminalTypeCount: terminalTypes.listTypes().length,
     allowUserTokenAuth: config.allowUserTokenAuth,
     userAccessTokenHeader: config.userAccessTokenHeader,
     databricksHostConfigured: Boolean(config.databricksHost),
@@ -320,6 +445,7 @@ async function main(): Promise<void> {
     config,
     logger,
     sessions,
+    terminalTypes,
     services: serviceRegistry,
     diagnostics,
   });

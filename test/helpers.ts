@@ -50,6 +50,7 @@ export class FakeSessionManager implements SessionManager {
       cols: input.cols || 120,
       rows: input.rows || 30,
       authMode: input.authMode || "m2m",
+      typeId: input.typeId || "terminal",
       attachedClients: 0,
     };
 

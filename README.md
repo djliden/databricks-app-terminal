@@ -11,6 +11,7 @@ When running inside a Databricks App, terminal commands execute under the app's 
 - Browser terminal UI with tabs (`xterm.js`)
 - In-memory PTY sessions (`node-pty`, no tmux dependency)
 - Session lifecycle APIs (list/create/attach/input/resize/kill)
+- Dynamic terminal type registry (filesystem-driven `terminal-types/*`)
 - WebSocket terminal streaming
 - Health/readiness/runtime diagnostics endpoints
 - Structured API errors and structured logs
@@ -18,12 +19,26 @@ When running inside a Databricks App, terminal commands execute under the app's 
 
 ## UI behavior
 
-- One session is created automatically if none exist.
+- If no sessions exist, a centered in-terminal TUI launcher opens first; backend session starts only after you choose a type.
 - Tabs are always visible.
-- `+` creates a new tab/session.
-- `Cmd+T` (macOS) / `Ctrl+T` (Windows/Linux) creates a new tab/session.
+- `+` opens the same in-terminal TUI launcher in the active tab.
+- `Cmd+T` (macOS) / `Ctrl+T` (Windows/Linux) opens the same launcher.
+- Launcher controls: `↑/↓` or `j/k`, `Enter`, `Esc`, `1..9`, plus `?` (help) and `a` (about).
 - Each tab shows a tiny auth badge (`m2m` / `user`); click it to toggle auth mode for that session.
 - Tab titles follow terminal title escape sequences from the running shell/app.
+
+## Terminal types
+
+Session types are discovered dynamically from `terminal-types/*` at startup.
+
+- Built-in default: `terminal` (base shell, no extra launch script)
+- Custom type folder contract:
+  - `terminal-types/<type-id>/type.json`
+  - `terminal-types/<type-id>/launch.sh`
+- `type.json` can include optional `icon` (unicode/custom glyph string) for CLI-style picker display.
+- Included profiles in this repo: `claude`, `codex`, `pi` (plus built-in `terminal`).
+- Bundled logo font assets live under `public/assets/terminal-icons` (source SVGs in `assets/terminal-icons/src`).
+- Type launch scripts run on top of the base terminal runtime/auth model.
 
 ## Databricks identity model
 
@@ -64,9 +79,12 @@ databricks apps deploy --profile SHARED
 - `GET /ready`
 - `GET /api/runtime/diagnostics`
 
+### Session types
+- `GET /api/session-types`
+
 ### Sessions
 - `GET /api/sessions`
-- `POST /api/sessions` (optional body: `{ cwd?, cols?, rows?, authMode?: "m2m" | "user" }`)
+- `POST /api/sessions` (optional body: `{ cwd?, cols?, rows?, authMode?: "m2m" | "user", typeId?: string }`)
 - `POST /api/sessions/:sessionId/attach`
 - `POST /api/sessions/:sessionId/input`
 - `POST /api/sessions/:sessionId/resize`
@@ -85,6 +103,7 @@ Core runtime env vars:
 - `PORT` (default `8080`)
 - `SHELL` (default `/bin/bash`)
 - `WEB_ROOT` (default `./public`)
+- `TERMINAL_TYPES_ROOT` (default `./terminal-types`)
 - `STRICT_RUNTIME_CHECKS` (default `true`)
 - `LOG_LEVEL` (`debug|info|warn|error`, default `info`)
 - `LOG_PATH` (default `./logs/databricks-app-terminal.jsonl`)

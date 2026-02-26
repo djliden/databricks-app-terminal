@@ -248,6 +248,15 @@ export class InMemoryPtySessionManager implements SessionManager {
       TERM: "xterm-256color",
     };
 
+    const typeId = input.typeId || "terminal";
+
+    mergedEnv.DBX_APP_TERMINAL_TYPE_ID = typeId;
+    if (input.typeEntrypointPath) {
+      mergedEnv.DBX_APP_TERMINAL_TYPE_ENTRYPOINT = input.typeEntrypointPath;
+    } else {
+      delete mergedEnv.DBX_APP_TERMINAL_TYPE_ENTRYPOINT;
+    }
+
     const authMode: SessionAuthMode = input.authMode || "m2m";
     const auth: SessionAuthState = {
       mode: authMode,
@@ -291,6 +300,7 @@ export class InMemoryPtySessionManager implements SessionManager {
       cols,
       rows,
       authMode,
+      typeId,
       attachedClients: 0,
     };
 
@@ -332,6 +342,7 @@ export class InMemoryPtySessionManager implements SessionManager {
       cols,
       rows,
       authMode,
+      typeId,
       hasCachedUserToken: Boolean(record.auth.userAccessToken),
     });
 
